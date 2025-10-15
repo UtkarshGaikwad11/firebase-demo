@@ -1,26 +1,59 @@
-// lib/firestore.ts
 import { db } from "../../firebase/firebase.config";
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from "firebase/firestore";
 
-// CREATE
-export const addUser = async (user: { name: string; email: string }) => {
-  await addDoc(collection(db, "users"), user);
+export interface User {
+  id?: string; // optional because Firestore generates it
+  name: string;
+  email: string;
+}
+
+export interface UpdateUser {
+  name?: string;
+  email?: string;
+}
+
+
+export const addUser = async (user: Omit<User, "id">): Promise<void> => {
+  try {
+    await addDoc(collection(db, "users"), user);
+  } catch (error) {
+    console.error("Error adding user:", error);
+    throw error;
+  }
 };
 
-// READ
-export const getUsers = async () => {
-  const snapshot = await getDocs(collection(db, "users"));
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+export const getUsers = async (): Promise<User[]> => {
+  try {
+    const snapshot = await getDocs(collection(db, "users"));
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...(doc.data() as Omit<User, "id">),
+    }));
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    return [];
+  }
 };
 
-// UPDATE
-export const updateUser = async (id: string, data: any) => {
-  const userRef = doc(db, "users", id);
-  await updateDoc(userRef, data);
+
+export const updateUser = async (id: string, data: UpdateUser): Promise<void> => {
+  try {
+    const userRef = doc(db, "users", id);
+    await updateDoc(userRef, data as Record<keyof UpdateUser, unknown>);
+  } catch (error) {
+    console.error("Error updating user:", error);
+    throw error;
+  }
 };
 
-// DELETE
-export const deleteUser = async (id: string) => {
-  const userRef = doc(db, "users", id);
-  await deleteDoc(userRef);
+
+export const deleteUser = async (id: string): Promise<void> => {
+  try {
+    const userRef = doc(db, "users", id);
+    await deleteDoc(userRef);
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    throw error;
+  }
 };

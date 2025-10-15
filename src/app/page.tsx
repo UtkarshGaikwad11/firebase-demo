@@ -1,61 +1,70 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { addUser, getUsers, updateUser, deleteUser } from "@/lib/firestore";
-import { Pencil, Trash2, Plus } from "lucide-react"; // Added Plus for Add User button
-
-interface User {
-  id?: string;
-  name: string;
-  email: string;
-}
+import { addUser, getUsers, updateUser, deleteUser, User as FirestoreUser } from "@/lib/firestore";
+import { Pencil, Trash2, Plus } from "lucide-react";
 
 export default function HomePage() {
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<FirestoreUser[]>([]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editingUser, setEditingUser] = useState<FirestoreUser | null>(null);
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
 
   // Load all users
   const fetchUsers = async () => {
-    const data = await getUsers();
-    setUsers(data as User[]);
+    try {
+      const data = await getUsers();
+      setUsers(data);
+    } catch (error) {
+      console.error("Failed to fetch users:", error);
+    }
   };
 
   useEffect(() => {
     fetchUsers();
   }, []);
 
+  // Add new user
   const handleAdd = async () => {
     if (!name.trim() || !email.trim()) {
       alert("Please fill in both fields");
       return;
     }
-    await addUser({ name, email });
-    setName("");
-    setEmail("");
-    fetchUsers();
+    try {
+      await addUser({ name, email });
+      setName("");
+      setEmail("");
+      fetchUsers();
+    } catch (error) {
+      console.error("Failed to add user:", error);
+    }
   };
 
-  const startEdit = (user: User) => {
+  // Start editing
+  const startEdit = (user: FirestoreUser) => {
     setEditingUser(user);
     setEditName(user.name);
     setEditEmail(user.email);
   };
 
+  // Update user
   const handleUpdate = async () => {
     if (!editName.trim() || !editEmail.trim()) {
       alert("Please fill in both fields");
       return;
     }
-    if (editingUser?.id) {
+    if (!editingUser?.id) return;
+
+    try {
       await updateUser(editingUser.id, { name: editName, email: editEmail });
       setEditingUser(null);
       setEditName("");
       setEditEmail("");
       fetchUsers();
+    } catch (error) {
+      console.error("Failed to update user:", error);
     }
   };
 
@@ -65,16 +74,21 @@ export default function HomePage() {
     setEditEmail("");
   };
 
+  // Delete user
   const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this user?")) {
+    if (!confirm("Are you sure you want to delete this user?")) return;
+    try {
       await deleteUser(id);
       fetchUsers();
+    } catch (error) {
+      console.error("Failed to delete user:", error);
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
       <div className="max-w-4xl mx-auto">
+        {/* Header */}
         <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center text-2xl">
@@ -83,11 +97,9 @@ export default function HomePage() {
             <h1 className="text-3xl font-bold text-gray-800">User Management</h1>
           </div>
 
-          {/* Add User Section */}
+          {/* Add User Form */}
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-700 mb-4">
-              Add New User
-            </h2>
+            <h2 className="text-lg font-semibold text-gray-700 mb-4">Add New User</h2>
             <div className="flex flex-col sm:flex-row gap-3">
               <input
                 className="border-2 border-gray-200 p-3 flex-1 rounded-lg focus:border-blue-500 focus:outline-none transition-colors"
@@ -113,7 +125,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* User List */}
+        {/* Users List */}
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <h2 className="text-xl font-semibold text-gray-800 mb-4">
             Users List ({users.length})
@@ -121,9 +133,7 @@ export default function HomePage() {
 
           {users.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
-              <p className="text-lg">
-                No users yet. Add your first user above! 👆
-              </p>
+              <p className="text-lg">No users yet. Add your first user above! 👆</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -169,9 +179,7 @@ export default function HomePage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-2xl">👤</span>
-                          <p className="text-lg font-semibold text-gray-800">
-                            {user.name}
-                          </p>
+                          <p className="text-lg font-semibold text-gray-800">{user.name}</p>
                         </div>
                         <div className="flex items-center gap-2 ml-8">
                           <span className="text-sm">📧</span>
@@ -187,7 +195,7 @@ export default function HomePage() {
                           Edit
                         </button>
                         <button
-                          onClick={() => handleDelete(user.id!)}
+                          onClick={() => user.id && handleDelete(user.id)}
                           className="flex items-center gap-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-sm hover:shadow-md"
                         >
                           <Trash2 size={18} />
