@@ -3,14 +3,23 @@
 import React, { useState, useEffect } from "react";
 import { addUser, getUsers, updateUser, deleteUser, User as FirestoreUser } from "@/lib/firestore";
 import { Pencil, Trash2, Plus } from "lucide-react";
+import { useFormik } from "formik";
+import * as Yup from "yup";
+
+// Validation schemas
+const userValidationSchema = Yup.object({
+  name: Yup.string()
+    .min(2, "Name must be at least 2 characters")
+    .max(50, "Name must be less than 50 characters")
+    .required("Name is required"),
+  email: Yup.string()
+    .email("Invalid email address")
+    .required("Email is required"),
+});
 
 export default function HomePage() {
   const [users, setUsers] = useState<FirestoreUser[]>([]);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [editingUser, setEditingUser] = useState<FirestoreUser | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editEmail, setEditEmail] = useState("");
 
   // Load all users
   const fetchUsers = async () => {
@@ -26,52 +35,57 @@ export default function HomePage() {
     fetchUsers();
   }, []);
 
-  // Add new user
-  const handleAdd = async () => {
-    if (!name.trim() || !email.trim()) {
-      alert("Please fill in both fields");
-      return;
-    }
-    try {
-      await addUser({ name, email });
-      setName("");
-      setEmail("");
-      fetchUsers();
-    } catch (error) {
-      console.error("Failed to add user:", error);
-    }
-  };
+  // Add user form with Formik
+  const addFormik = useFormik({
+    initialValues: {
+      name: "",
+      email: "",
+    },
+    validationSchema: userValidationSchema,
+    onSubmit: async (values, { resetForm }) => {
+      try {
+        await addUser(values);
+        resetForm();
+        fetchUsers();
+      } catch (error) {
+        console.error("Failed to add user:", error);
+      }
+    },
+  });
+
+  // Edit user form with Formik
+  const editFormik = useFormik({
+    initialValues: {
+      name: "",
+      email: "",
+    },
+    validationSchema: userValidationSchema,
+    enableReinitialize: true,
+    onSubmit: async (values) => {
+      if (!editingUser?.id) return;
+      try {
+        await updateUser(editingUser.id, values);
+        setEditingUser(null);
+        editFormik.resetForm();
+        fetchUsers();
+      } catch (error) {
+        console.error("Failed to update user:", error);
+      }
+    },
+  });
 
   // Start editing
   const startEdit = (user: FirestoreUser) => {
     setEditingUser(user);
-    setEditName(user.name);
-    setEditEmail(user.email);
-  };
-
-  // Update user
-  const handleUpdate = async () => {
-    if (!editName.trim() || !editEmail.trim()) {
-      alert("Please fill in both fields");
-      return;
-    }
-    if (!editingUser?.id) return;
-
-    try {
-      await updateUser(editingUser.id, { name: editName, email: editEmail });
-      setEditingUser(null);
-      setEditName("");
-      setEditEmail("");
-      fetchUsers();
-    } catch (error) {
-      console.error("Failed to update user:", error);
-    }
+    editFormik.setValues({
+      name: user.name,
+      email: user.email,
+    });
   };
 
   const cancelEdit = () => {
     setEditingUser(null);
-    setEditName("");
-    setEditEmail("");
+    editFormik.resetForm();
   };
 
   // Delete user
@@ -97,31 +111,56 @@ export default function HomePage() {
             <h1 className="text-3xl font-bold text-gray-800">User Management</h1>
           </div>
 
-          {/* Add User Form */}
+          {/* Add User Form with Formik */}
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-700 mb-4">Add New User</h2>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <input
-                className="border-2 border-gray-200 p-3 flex-1 rounded-lg focus:border-blue-500 focus:outline-none transition-colors"
-                placeholder="Full Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-              <input
-                className="border-2 border-gray-200 p-3 flex-1 rounded-lg focus:border-blue-500 focus:outline-none transition-colors"
-                placeholder="Email Address"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-              <button
-                onClick={handleAdd}
-                className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg"
-              >
-                <Plus size={18} />
-                Add User
-              </button>
-            </div>
+            <form onSubmit={addFormik.handleSubmit}>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1">
+                  <input
+                    className={`border-2 ${
+                      addFormik.touched.name && addFormik.errors.name
+                        ? "border-red-400"
+                        : "border-gray-200"
+                    } p-3 w-full rounded-lg focus:border-blue-500 focus:outline-none transition-colors`}
+                    placeholder="Full Name"
+                    name="name"
+                    value={addFormik.values.name}
+                    onChange={addFormik.handleChange}
+                    onBlur={addFormik.handleBlur}
+                  />
+                  {addFormik.touched.name && addFormik.errors.name && (
+                    <p className="text-red-500 text-xs mt-1">{String(addFormik.errors.name)}</p>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <input
+                    className={`border-2 ${
+                      addFormik.touched.email && addFormik.errors.email
+                        ? "border-red-400"
+                        : "border-gray-200"
+                    } p-3 w-full rounded-lg focus:border-blue-500 focus:outline-none transition-colors`}
+                    placeholder="Email Address"
+                    type="email"
+                    name="email"
+                    value={addFormik.values.email}
+                    onChange={addFormik.handleChange}
+                    onBlur={addFormik.handleBlur}
+                  />
+                  {addFormik.touched.email && addFormik.errors.email && (
+                    <p className="text-red-500 text-xs mt-1">{String(addFormik.errors.email)}</p>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  disabled={addFormik.isSubmitting}
+                  className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Plus size={18} />
+                  Add User
+                </button>
+              </div>
+            </form>
           </div>
         </div>
 
@@ -143,37 +182,63 @@ export default function HomePage() {
                   className="border-2 border-gray-100 rounded-xl p-5 hover:shadow-md transition-shadow bg-gradient-to-r from-gray-50 to-white"
                 >
                   {editingUser?.id === user.id ? (
-                    <div className="space-y-3">
-                      <div className="flex flex-col sm:flex-row gap-3">
-                        <input
-                          className="border-2 border-blue-300 p-3 flex-1 rounded-lg focus:border-blue-500 focus:outline-none"
-                          placeholder="Name"
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                        />
-                        <input
-                          className="border-2 border-blue-300 p-3 flex-1 rounded-lg focus:border-blue-500 focus:outline-none"
-                          placeholder="Email"
-                          type="email"
-                          value={editEmail}
-                          onChange={(e) => setEditEmail(e.target.value)}
-                        />
+                    <form onSubmit={editFormik.handleSubmit}>
+                      <div className="space-y-3">
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          <div className="flex-1">
+                            <input
+                              className={`border-2 ${
+                                editFormik.touched.name && editFormik.errors.name
+                                  ? "border-red-400"
+                                  : "border-blue-300"
+                              } p-3 w-full rounded-lg focus:border-blue-500 focus:outline-none`}
+                              placeholder="Name"
+                              name="name"
+                              value={editFormik.values.name}
+                              onChange={editFormik.handleChange}
+                              onBlur={editFormik.handleBlur}
+                            />
+                            {editFormik.touched.name && editFormik.errors.name && (
+                              <p className="text-red-500 text-xs mt-1">{String(editFormik.errors.name)}</p>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <input
+                              className={`border-2 ${
+                                editFormik.touched.email && editFormik.errors.email
+                                  ? "border-red-400"
+                                  : "border-blue-300"
+                              } p-3 w-full rounded-lg focus:border-blue-500 focus:outline-none`}
+                              placeholder="Email"
+                              type="email"
+                              name="email"
+                              value={editFormik.values.email}
+                              onChange={editFormik.handleChange}
+                              onBlur={editFormik.handleBlur}
+                            />
+                            {editFormik.touched.email && editFormik.errors.email && (
+                              <p className="text-red-500 text-xs mt-1">{String(editFormik.errors.email)}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            type="button"
+                            onClick={cancelEdit}
+                            className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={editFormik.isSubmitting}
+                            className="flex items-center gap-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            ✓ Save Changes
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex gap-2 justify-end">
-                        <button
-                          onClick={cancelEdit}
-                          className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handleUpdate}
-                          className="flex items-center gap-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2 rounded-lg font-medium transition-all"
-                        >
-                          ✓ Save Changes
-                        </button>
-                      </div>
-                    </div>
+                    </form>
                   ) : (
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                       <div className="flex-1">
