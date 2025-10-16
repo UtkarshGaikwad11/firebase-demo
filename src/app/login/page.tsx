@@ -30,22 +30,38 @@ export default function LoginPage() {
   // -----------------------------
   // Handle Login
   // -----------------------------
-  const handleLogin = async (values: { email: string; password: string }) => {
-    setFirebaseError("");
-    setLoading(true);
-    try {
-      await signInWithEmailAndPassword(auth, values.email, values.password);
-      router.push("/");
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setFirebaseError(err.message || "Email or password is incorrect");
-      } else {
-        setFirebaseError("Email or password is incorrect");
-      }
-    } finally {
-      setLoading(false);
+ const handleLogin = async (values: { email: string; password: string }) => {
+  setFirebaseError("");
+  setLoading(true);
+  try {
+    await signInWithEmailAndPassword(auth, values.email, values.password);
+    router.push("/");
+  } catch (err: unknown) {
+    // Firebase error type
+    const firebaseErr = err as { code?: string; message?: string };
+
+    switch (firebaseErr.code) {
+      case "auth/invalid-email":
+        setFirebaseError("Invalid email address.");
+        break;
+      case "auth/user-disabled":
+        setFirebaseError("This account has been disabled.");
+        break;
+      case "auth/user-not-found":
+        setFirebaseError("No account found with this email.");
+        break;
+      case "auth/wrong-password":
+        setFirebaseError("Incorrect password.");
+        break;
+      default:
+        setFirebaseError("Email or password is incorrect.");
+        break;
     }
-  };
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-120px)] py-8">
