@@ -28,25 +28,38 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const handleSignup = async (values: { email: string; password: string }) => {
-    setFirebaseError("");
-    setLoading(true);
-    try {
-      await createUserWithEmailAndPassword(auth, values.email, values.password);
-      router.push("/");
-    } catch (err: any) {
-      // Friendly error messages
-      if (err.code === "auth/email-already-in-use") {
-        setFirebaseError("This email is already registered");
-      } else if (err.code === "auth/weak-password") {
-        setFirebaseError("Password is too weak");
-      } else {
-        setFirebaseError("Failed to create account. Please try again");
-      }
-    } finally {
-      setLoading(false);
+ const handleSignup = async (values: { email: string; password: string }) => {
+  setFirebaseError("");
+  setLoading(true);
+
+  try {
+    await createUserWithEmailAndPassword(auth, values.email, values.password);
+    router.push("/");
+  } catch (err: unknown) {
+    // Define the shape of Firebase Auth errors
+    interface FirebaseAuthError {
+      code: string;
+      message: string;
     }
-  };
+
+    const firebaseErr = err as FirebaseAuthError;
+
+    // Friendly error messages
+    switch (firebaseErr.code) {
+      case "auth/email-already-in-use":
+        setFirebaseError("This email is already registered");
+        break;
+      case "auth/weak-password":
+        setFirebaseError("Password is too weak");
+        break;
+      default:
+        setFirebaseError("Failed to create account. Please try again");
+        break;
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-120px)] py-8">
